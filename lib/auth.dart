@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+FirebaseAuth auth = FirebaseAuth.instance;
+
 class Signup extends StatefulWidget {
   const Signup({super.key});
 
@@ -10,96 +12,115 @@ class Signup extends StatefulWidget {
 }
 
 class _SignupState extends State<Signup> {
-  TextEditingController emailController=TextEditingController();
-  TextEditingController passController=TextEditingController();
-  TextEditingController usernameController=TextEditingController();
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
 
-  var users= FirebaseFirestore.instance.collection('users');
-signup() async{
-  try {
-  final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-    email: emailController.text,
-    password: passController.text,
-  );
-  await users.add({
-    'email':emailController.text,
-    'password':passController.text,
-    'username':usernameController.text,
-    'id':credential.user?.uid,
-  });
-print("user created successfuly");
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("User created successfuly"),));
+  Future<void> signUpUser() async {
+    String name = nameController.text.trim();
+    String email = emailController.text.trim();
+    String password = passwordController.text.trim();
 
-} on FirebaseAuthException catch (e) {
-  if (e.code == 'weak-password') {
-    print('The password provided is too weak.');
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("The password provided is too weak."),));
-  } else if (e.code == 'email-already-in-use') {
-    print('The account already exists for that email.');
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("The account already exists for that email."),));
+    if (name.isEmpty || email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("All fields are required!")),
+      );
+      return;
+    }
+
+    if (!RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$').hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter a valid email address!")),
+      );
+      return;
+    }
+
+    try {
+      final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set({
+        'name': name,
+        'email': email,
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("User Account Created Successfully!")),
+      );
+
+      // Navigate to Login Page
+      Navigator.pushReplacementNamed(context, '/login');
+
+      nameController.clear();
+      emailController.clear();
+      passwordController.clear();
+    } on FirebaseAuthException catch (e) {
+      String errorMessage = "Signup failed. Please try again.";
+      if (e.code == 'weak-password') {
+        errorMessage = "The password is too weak.";
+      } else if (e.code == 'email-already-in-use') {
+        errorMessage = "The account already exists for that email.";
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorMessage)));
+    } catch (e) {
+      print(e);
+    }
   }
-} catch (e) {
-  print(e);
-}
-}
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Register Now'),
-      ),
-      body: 
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0),
+      appBar: AppBar(title: const Text("Create an account!")),
+      body: Center(
         child: ListView(
+          padding: const EdgeInsets.all(10),
           children: [
-            SizedBox(height: 20,),
             TextField(
-              controller: usernameController,
-              decoration: InputDecoration(
-                label: Text("Enter username"),
-                hintText: "Username"
-               ,border: OutlineInputBorder(),
-
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: "Name",
+                border: OutlineInputBorder(),
               ),
             ),
-             SizedBox(height: 20,),
+            const SizedBox(height: 10),
             TextField(
               controller: emailController,
-              decoration: InputDecoration(
-                label: Text("Enter email"),
-                hintText: "Email"
-               ,border: OutlineInputBorder(),
-
+              decoration: const InputDecoration(
+                labelText: "Email",
+                border: OutlineInputBorder(),
               ),
             ),
-             SizedBox(height: 20,),
+            const SizedBox(height: 10),
             TextField(
-              controller: passController,
-              decoration: InputDecoration(
-                label: Text("Enter password"),
-                hintText: "Password"
-               ,border: OutlineInputBorder(),
-
+              controller: passwordController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: "Password",
+                border: OutlineInputBorder(),
               ),
             ),
-            SizedBox(height: 20,),
-            ElevatedButton(onPressed: (){
-              signup();
-            }, child: Text("Register")),
-
-            SizedBox(height: 20,),
-             GestureDetector(onTap: (){
-             Navigator.pushNamed(context, "/login");
-            }, child: Text("Already a user? Login now"))
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: signUpUser,
+              child: const Text("Sign Up"),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pushReplacementNamed(context, '/login');
+              },
+              child: const Text("Already have an account? Login"),
+            ),
           ],
         ),
-      )
-      ,
+      ),
     );
   }
 }
 
+// --------------------------- LOGIN SCREEN ---------------------------
 
 class Login extends StatefulWidget {
   const Login({super.key});
@@ -109,67 +130,93 @@ class Login extends StatefulWidget {
 }
 
 class _LoginState extends State<Login> {
-    TextEditingController emailController=TextEditingController();
-  TextEditingController passController=TextEditingController();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
 
-  login()async{
+  Future<void> loginUser() async {
+    String email = emailController.text.trim();
+    String password = passwordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("All fields are required!")),
+      );
+      return;
+    }
+
+    if (!RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$').hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Invalid email format!")),
+      );
+      return;
+    }
+
     try {
-  final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
-    email: emailController.text,
-    password: passController.text
-  );
-     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Signed in as ${emailController.text}"),));
-     Navigator.pushNamed(context, '/addmedicine');
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
 
-} on FirebaseAuthException catch (e) {
-  if (e.code == 'user-not-found') {
-    print('No user found for that email.');
-     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("No user found for that email. Please create an account first."),));
-     Navigator.pushNamed(context, '/');
-  } else if (e.code == 'invalid-credentials') {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Wrong password provided for that user."),));
-    print('Wrong password provided for that user.');
-  }
-}
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Login Successful!")),
+      );
+
+      // Navigate to Medicine Screen
+      Navigator.pushReplacementNamed(context, '/MedicineScreen');
+    } on FirebaseAuthException catch (e) {
+      String errorMessage = "Login failed. Please try again.";
+      if (e.code == 'user-not-found') {
+        errorMessage = "No user found with this email!";
+      } else if (e.code == 'wrong-password') {
+        errorMessage = "Incorrect password!";
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errorMessage)),
+      );
+    } catch (e) {
+      print("Login error: $e");
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Login Now'),
-      ),
-      body: 
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0),
+      appBar: AppBar(title: const Text("Login")),
+      body: Center(
         child: ListView(
+          padding: const EdgeInsets.all(10),
           children: [
-             SizedBox(height: 20,),
             TextField(
               controller: emailController,
-              decoration: InputDecoration(
-                label: Text("Enter email"),
-                hintText: "Email"
-               ,border: OutlineInputBorder(),
+              decoration: const InputDecoration(
+                labelText: "Email",
+                border: OutlineInputBorder(),
               ),
             ),
-             SizedBox(height: 20,),
+            const SizedBox(height: 10),
             TextField(
-              controller: passController,
-              decoration: InputDecoration(
-                label: Text("Enter password"),
-                hintText: "Password"
-               ,border: OutlineInputBorder(),
+              controller: passwordController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: "Password",
+                border: OutlineInputBorder(),
               ),
             ),
-            SizedBox(height: 20,),
-            ElevatedButton(onPressed: (){
-              login();
-            }, child: Text("Login"))
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: loginUser,
+              child: const Text("Login"),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pushReplacementNamed(context, '/Signup');
+              },
+              child: const Text("Don't have an account? Sign Up"),
+            ),
           ],
         ),
-      )
-      ,
+      ),
     );
   }
 }
