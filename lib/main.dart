@@ -8,6 +8,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 
+
+
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -26,12 +29,14 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: Signup(),
+      home: ProductAPI(),
       routes: {
-        '/addmedicine': (context) => const AddMedicine(),
-        '/login': (context) => const Login(),
-        '/MedicineScreen': (context) => const MedicineScreen(),
-        '/Signup': (context) => const Signup(),
+        // '/addmedicine': (context) => const AddMedicine(),
+        // '/login': (context) => const Login(),
+        // '/MedicineScreen': (context) => const MedicineScreen(),
+        // '/Signup': (context) => const Signup(),
+        '/api': (context) => ProductAPI(),
+
       },
     );
   }
